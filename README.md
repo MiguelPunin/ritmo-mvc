@@ -30,7 +30,18 @@ npm run dev
 
 Abre [localhost:3000](http://localhost:3000). Si ejecutas el proyecto sin configurar Supabase, puedes entrar como cliente o entrenador con datos de prueba.
 
-## Conectar Supabase
+## Usar la base de prueba
+
+Las migraciones ya están aplicadas en la base de la entrega. Para usarla, crea un archivo `.env.local` junto a `package.json` y copia este bloque:
+
+```dotenv
+SUPABASE_URL=https://lclrgaghdvhoogzxmwut.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_zG5bUQE0IHUR93MOUtsYJg_Qmpcbaxj
+```
+
+Ejecuta `npm ci` y `npm run dev`. Si el servidor ya estaba abierto, reinícialo. Entra en [localhost:3000](http://localhost:3000) con una de las cuentas de prueba de arriba. Los cambios se guardan en la base compartida.
+
+## Configurar una base propia
 
 1. En una base nueva, abre el **SQL Editor** y ejecuta las migraciones en orden: [001](supabase/migrations/001_ritmo.sql), [002](supabase/migrations/002_datos_cliente_y_rutina.sql) y [003](supabase/migrations/003_cancelar_meta_programada.sql).
 2. En **Authentication → Users**, crea una cuenta para el entrenador y otra para el cliente, confirma sus correos y copia los UUID de ambas.
