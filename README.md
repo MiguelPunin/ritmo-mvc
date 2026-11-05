@@ -8,6 +8,17 @@ Ritmo es una aplicación de seguimiento para clientes de un gimnasio y sus entre
 
 [Ver la demostración en YouTube](https://youtu.be/_7xACeKQebk)
 
+## Cuentas de prueba
+
+Estas cuentas permiten probar los dos roles en una instalación conectada al proyecto Supabase de la entrega.
+
+| Rol | Correo | Contraseña de prueba |
+| --- | --- | --- |
+| Cliente (Miguel) | `miguel@gmail.com` | `123456` |
+| Entrenador | `entrenador@gmail.com` | `123456` |
+
+Con la cuenta de cliente puedes proponer una meta y registrar hábitos. Con la cuenta de entrenador puedes revisar la propuesta y configurar el plan semanal.
+
 ## Ejecutar el proyecto
 
 Se necesita Node.js 22.13 o superior y npm. Desde la carpeta del proyecto:
