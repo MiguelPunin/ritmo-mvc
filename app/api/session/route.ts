@@ -23,11 +23,13 @@ export async function GET() {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {
-    if (e instanceof DomainError && e.status === 401)
+    if (e instanceof DomainError && e.status === 401) {
+      await clearSession();
       return Response.json(
         { user: null, configured: configured() },
         { headers: { "Cache-Control": "no-store" } },
       );
+    }
     return failure(e);
   }
 }

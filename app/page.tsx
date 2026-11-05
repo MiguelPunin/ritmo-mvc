@@ -36,7 +36,12 @@ import type {
   Indicador,
   IndicatorKind,
 } from "../domain/types";
-import { goalLabels, kindLabels } from "../domain/types";
+import {
+  goalLabels,
+  kindLabels,
+  muscleGroups,
+  trainingDays,
+} from "../domain/types";
 import { addDays, evaluate, monday, today, hours } from "../domain/core";
 type View = "resumen" | "metas" | "registro" | "historial" | "clientes";
 type Data = {
@@ -195,8 +200,8 @@ export default function App() {
     .filter((m) => m.client_id === client?.id)
     .sort(
       (a, b) =>
-        ({ activa: 0, propuesta: 1, cerrada: 2 })[a.status] -
-          { activa: 0, propuesta: 1, cerrada: 2 }[b.status] ||
+        ({ activa: 0, propuesta: 1, cerrada: 2, cancelada: 3 })[a.status] -
+          { activa: 0, propuesta: 1, cerrada: 2, cancelada: 3 }[b.status] ||
         b.start_date.localeCompare(a.start_date),
     );
   const meta = goals.find((m) => m.id === goalId) ?? goals[0],
@@ -463,7 +468,9 @@ export default function App() {
                         ? "META ACTIVA"
                         : meta.status === "cerrada"
                           ? "META CERRADA"
-                          : "PROPUESTA PENDIENTE"}
+                          : meta.status === "cancelada"
+                            ? "META CANCELADA"
+                            : "PROPUESTA PENDIENTE"}
                     </span>
                     <h2>{goalLabels[meta.type]}</h2>
                     <p>
@@ -489,216 +496,219 @@ export default function App() {
                     <span>✦</span>
                   </div>
                 </section>
-                {meta.status !== "propuesta" && result && (
-                  <>
-                    <div className="section-line">
-                      <div>
-                        <h2>
-                          {wholePeriod
-                            ? "Tu meta, en hábitos"
-                            : "Tu semana, en hábitos"}
-                        </h2>
-                        <p>
-                          El cumplimiento refleja tus registros, no un resultado
-                          físico.
-                        </p>
-                      </div>
-                      <div className="period-controls">
-                        <select
-                          aria-label="Periodo de seguimiento"
-                          value={wholePeriod ? "meta" : "semana"}
-                          onChange={(e) =>
-                            setWholePeriod(e.target.value === "meta")
-                          }
-                        >
-                          <option value="semana">Por semana</option>
-                          <option value="meta">Meta completa</option>
-                        </select>
-                        {!wholePeriod && (
-                          <div className="week-picker">
-                            <button
-                              aria-label="Semana anterior"
-                              onClick={() => setWeek(week - 1)}
-                            >
-                              <ChevronLeft size={15} />
-                            </button>
-                            <span>
-                              {nice(from)} – {nice(to)}
-                            </span>
-                            <button
-                              aria-label="Semana siguiente"
-                              disabled={week >= 0}
-                              onClick={() => setWeek(week + 1)}
-                            >
-                              <ChevronRight size={15} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="stat-grid">
-                      {result.metrics.map((m, index) => {
-                        const Icon = {
-                          exercise: Dumbbell,
-                          food: Leaf,
-                          sleep: Moon,
-                        }[m.key];
-                        return (
-                          <article
-                            className={"stat-card tone-" + index}
-                            key={m.key}
-                          >
-                            <div className="stat-top">
-                              <span className="stat-icon">
-                                <Icon size={21} />
-                              </span>
-                              <span className="micro-tag">
-                                {m.covered}/{result.eligible} días con datos
-                              </span>
-                            </div>
-                            <div className="stat-number">
-                              {fmt(m.percent)}
-                              <span>{m.percent === null ? "" : "%"}</span>
-                            </div>
-                            <h3>{m.label}</h3>
-                            <div className="track">
-                              <span style={{ width: (m.percent ?? 0) + "%" }} />
-                            </div>
-                            <div className="stat-bottom">
-                              <span>
-                                {m.covered
-                                  ? `${m.valid} días válidos`
-                                  : "Sin información"}
-                              </span>
-                              <span>Objetivo {fmt(m.target)}</span>
-                            </div>
-                          </article>
-                        );
-                      })}
-                      <article className="stat-card overall">
-                        <div className="stat-top">
-                          <span className="stat-icon">
-                            <Flame size={21} />
-                          </span>
-                          <span className="micro-tag">PROMEDIO</span>
-                        </div>
-                        <div className="stat-number">
-                          {fmt(result.combined)}
-                          <span>{result.combined === null ? "" : "%"}</span>
-                        </div>
-                        <h3>Cumplimiento conjunto</h3>
-                        <div className="track">
-                          <span
-                            style={{ width: (result.combined ?? 0) + "%" }}
-                          />
-                        </div>
-                        <div className="stat-bottom">
-                          <span>
-                            {!result.eligible
-                              ? "Sin días elegibles"
-                              : result.provisional
-                                ? "Resultado provisional"
-                                : "Periodo completo"}
-                          </span>
-                          <TrendingUp size={14} />
-                        </div>
-                      </article>
-                    </div>
-                    <div className="dashboard-columns">
-                      <section className="panel">
-                        <div className="panel-title">
-                          <div>
-                            <h2>Más cerca de tu meta</h2>
-                            <p>Tus indicadores, cada uno a su ritmo.</p>
-                          </div>
-                          <TrendingUp size={19} color="#8fa078" />
-                        </div>
-                        {result.indicators.map((i) => (
-                          <IndicatorView
-                            key={i.id}
-                            indicator={i}
-                            state={state}
-                            end={to}
-                            now={now}
-                          />
-                        ))}
-                      </section>
-                      <section className="panel coach-panel">
-                        <div className="panel-title">
-                          <h2>Tu entrenador te acompaña</h2>
-                          <span className="live-dot" />
-                        </div>
-                        <div className="coach-person">
-                          <span className="avatar">
-                            {initials(
-                              state.usuarios.find(
-                                (u) => u.id === client?.trainer_id,
-                              )?.name ?? "Entrenador",
-                            )}
-                          </span>
-                          <div>
-                            <strong>
-                              {state.usuarios.find(
-                                (u) => u.id === client?.trainer_id,
-                              )?.name ?? "Entrenador asignado"}
-                            </strong>
-                            <small>Observación vigente</small>
-                          </div>
-                        </div>
-                        <blockquote>
-                          “
-                          {meta.observation ||
-                            "Todavía no hay una observación. Tu entrenador podrá dejarte un comentario sobre el seguimiento."}
-                          ”
-                        </blockquote>
-                        <div className="coach-date">
-                          {meta.observation_at
-                            ? "Actualizada el " +
-                              new Date(meta.observation_at).toLocaleDateString(
-                                "es-EC",
-                              )
-                            : "Pendiente de revisión"}
-                          {trainer && meta.status !== "cerrada" && (
-                            <button
-                              onClick={() => open({ kind: "observe", meta })}
-                            >
-                              <Pencil size={13} />
-                              Editar
-                            </button>
-                          )}
-                        </div>
-                        <div className="coach-note">
-                          <Leaf size={18} />
+                {(meta.status === "activa" || meta.status === "cerrada") &&
+                  result && (
+                    <>
+                      <div className="section-line">
+                        <div>
+                          <h2>
+                            {wholePeriod
+                              ? "Tu meta, en hábitos"
+                              : "Tu semana, en hábitos"}
+                          </h2>
                           <p>
-                            Cumplir hábitos y lograr cambios físicos son
-                            resultados diferentes. Valora ambos por separado.
+                            El cumplimiento refleja tus registros, no un
+                            resultado físico.
                           </p>
                         </div>
-                      </section>
-                    </div>
-                    <section className="panel recent">
-                      <div className="panel-title">
-                        <div>
-                          <h2>Pequeños pasos, grandes avances</h2>
-                          <p>Tus últimos registros</p>
+                        <div className="period-controls">
+                          <select
+                            aria-label="Periodo de seguimiento"
+                            value={wholePeriod ? "meta" : "semana"}
+                            onChange={(e) =>
+                              setWholePeriod(e.target.value === "meta")
+                            }
+                          >
+                            <option value="semana">Por semana</option>
+                            <option value="meta">Meta completa</option>
+                          </select>
+                          {!wholePeriod && (
+                            <div className="week-picker">
+                              <button
+                                aria-label="Semana anterior"
+                                onClick={() => setWeek(week - 1)}
+                              >
+                                <ChevronLeft size={15} />
+                              </button>
+                              <span>
+                                {nice(from)} – {nice(to)}
+                              </span>
+                              <button
+                                aria-label="Semana siguiente"
+                                disabled={week >= 0}
+                                onClick={() => setWeek(week + 1)}
+                              >
+                                <ChevronRight size={15} />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        <button
-                          className="text-link"
-                          onClick={() => setView("historial")}
-                        >
-                          Ver historial <ArrowRight size={15} />
-                        </button>
                       </div>
-                      <Records
-                        records={records.slice(0, 4)}
-                        indicators={indicators}
-                        editable={false}
-                        onEdit={edit}
-                        onDelete={remove}
-                      />
-                    </section>
-                  </>
-                )}
+                      <div className="stat-grid">
+                        {result.metrics.map((m, index) => {
+                          const Icon = {
+                            exercise: Dumbbell,
+                            food: Leaf,
+                            sleep: Moon,
+                          }[m.key];
+                          return (
+                            <article
+                              className={"stat-card tone-" + index}
+                              key={m.key}
+                            >
+                              <div className="stat-top">
+                                <span className="stat-icon">
+                                  <Icon size={21} />
+                                </span>
+                                <span className="micro-tag">
+                                  {m.covered}/{result.eligible} días con datos
+                                </span>
+                              </div>
+                              <div className="stat-number">
+                                {fmt(m.percent)}
+                                <span>{m.percent === null ? "" : "%"}</span>
+                              </div>
+                              <h3>{m.label}</h3>
+                              <div className="track">
+                                <span
+                                  style={{ width: (m.percent ?? 0) + "%" }}
+                                />
+                              </div>
+                              <div className="stat-bottom">
+                                <span>
+                                  {m.covered
+                                    ? `${m.valid} días válidos`
+                                    : "Sin información"}
+                                </span>
+                                <span>Objetivo {fmt(m.target)}</span>
+                              </div>
+                            </article>
+                          );
+                        })}
+                        <article className="stat-card overall">
+                          <div className="stat-top">
+                            <span className="stat-icon">
+                              <Flame size={21} />
+                            </span>
+                            <span className="micro-tag">PROMEDIO</span>
+                          </div>
+                          <div className="stat-number">
+                            {fmt(result.combined)}
+                            <span>{result.combined === null ? "" : "%"}</span>
+                          </div>
+                          <h3>Cumplimiento conjunto</h3>
+                          <div className="track">
+                            <span
+                              style={{ width: (result.combined ?? 0) + "%" }}
+                            />
+                          </div>
+                          <div className="stat-bottom">
+                            <span>
+                              {!result.eligible
+                                ? "Sin días elegibles"
+                                : result.provisional
+                                  ? "Resultado provisional"
+                                  : "Periodo completo"}
+                            </span>
+                            <TrendingUp size={14} />
+                          </div>
+                        </article>
+                      </div>
+                      <div className="dashboard-columns">
+                        <section className="panel">
+                          <div className="panel-title">
+                            <div>
+                              <h2>Más cerca de tu meta</h2>
+                              <p>Tus indicadores, cada uno a su ritmo.</p>
+                            </div>
+                            <TrendingUp size={19} color="#8fa078" />
+                          </div>
+                          {result.indicators.map((i) => (
+                            <IndicatorView
+                              key={i.id}
+                              indicator={i}
+                              state={state}
+                              end={to}
+                              now={now}
+                            />
+                          ))}
+                        </section>
+                        <section className="panel coach-panel">
+                          <div className="panel-title">
+                            <h2>Tu entrenador te acompaña</h2>
+                            <span className="live-dot" />
+                          </div>
+                          <div className="coach-person">
+                            <span className="avatar">
+                              {initials(
+                                state.usuarios.find(
+                                  (u) => u.id === client?.trainer_id,
+                                )?.name ?? "Entrenador",
+                              )}
+                            </span>
+                            <div>
+                              <strong>
+                                {state.usuarios.find(
+                                  (u) => u.id === client?.trainer_id,
+                                )?.name ?? "Entrenador asignado"}
+                              </strong>
+                              <small>Observación vigente</small>
+                            </div>
+                          </div>
+                          <blockquote>
+                            “
+                            {meta.observation ||
+                              "Todavía no hay una observación. Tu entrenador podrá dejarte un comentario sobre el seguimiento."}
+                            ”
+                          </blockquote>
+                          <div className="coach-date">
+                            {meta.observation_at
+                              ? "Actualizada el " +
+                                new Date(
+                                  meta.observation_at,
+                                ).toLocaleDateString("es-EC")
+                              : "Pendiente de revisión"}
+                            {trainer && meta.status !== "cerrada" && (
+                              <button
+                                onClick={() => open({ kind: "observe", meta })}
+                              >
+                                <Pencil size={13} />
+                                Editar
+                              </button>
+                            )}
+                          </div>
+                          <div className="coach-note">
+                            <Leaf size={18} />
+                            <p>
+                              Cumplir hábitos y lograr cambios físicos son
+                              resultados diferentes. Valora ambos por separado.
+                            </p>
+                          </div>
+                        </section>
+                      </div>
+                      <section className="panel recent">
+                        <div className="panel-title">
+                          <div>
+                            <h2>Pequeños pasos, grandes avances</h2>
+                            <p>Tus últimos registros</p>
+                          </div>
+                          <button
+                            className="text-link"
+                            onClick={() => setView("historial")}
+                          >
+                            Ver historial <ArrowRight size={15} />
+                          </button>
+                        </div>
+                        <Records
+                          records={records.slice(0, 4)}
+                          indicators={indicators}
+                          editable={false}
+                          onEdit={edit}
+                          onDelete={remove}
+                        />
+                      </section>
+                    </>
+                  )}
               </>
             ) : (
               <Empty
@@ -751,7 +761,18 @@ export default function App() {
                     </div>
                     <span className={"status " + g.status}>{g.status}</span>
                   </div>
-                  {g.status !== "propuesta" && (
+                  {(g.reported_weight_kg != null || g.goal_details) && (
+                    <div className="notice">
+                      {g.reported_weight_kg != null && (
+                        <strong>
+                          Peso reportado al proponer la meta:{" "}
+                          {g.reported_weight_kg} kg
+                        </strong>
+                      )}
+                      {g.goal_details && <p>{g.goal_details}</p>}
+                    </div>
+                  )}
+                  {(g.status === "activa" || g.status === "cerrada") && (
                     <>
                       <div className="objective-grid">
                         {[
@@ -774,7 +795,7 @@ export default function App() {
                               g.sleep_min +
                               "–" +
                               g.sleep_max +
-                              " h",
+                              " h por noche",
                           },
                         ].map(({ Icon, label, value }) => (
                           <div key={label}>
@@ -784,6 +805,34 @@ export default function App() {
                           </div>
                         ))}
                       </div>
+                      {!!g.training_plan?.length && (
+                        <div className="indicator-list">
+                          <h3>Rutina semanal</h3>
+                          <p>
+                            {g.training_plan.length} días de entrenamiento ·{" "}
+                            {g.training_plan.reduce(
+                              (total, session) => total + session.minutes,
+                              0,
+                            )}{" "}
+                            min por semana
+                          </p>
+                          {g.training_plan.map((session) => (
+                            <div key={session.day}>
+                              <span>
+                                <strong>{session.day}</strong>
+                                <small>{session.groups.join(" · ")}</small>
+                              </span>
+                              <strong>{session.minutes} min</strong>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {g.observation && (
+                        <p className="notice">
+                          <strong>Comentario del entrenador: </strong>
+                          {g.observation}
+                        </p>
+                      )}
                       <div className="indicator-list">
                         {state.indicadores
                           .filter((i) => i.meta_id === g.id)
@@ -830,26 +879,29 @@ export default function App() {
                         Configurar y activar <ArrowRight size={16} />
                       </button>
                     )}
-                    {trainer && g.status !== "cerrada" && (
-                      <>
-                        <button
-                          className="btn secondary"
-                          onClick={() => open({ kind: "observe", meta: g })}
-                        >
-                          <Pencil size={15} />
-                          Observación
-                        </button>
-                        <button
-                          className="btn subtle"
-                          onClick={() => open({ kind: "close", meta: g })}
-                        >
-                          {g.status === "propuesta"
-                            ? "Cerrar propuesta"
-                            : "Cerrar meta"}
-                        </button>
-                      </>
-                    )}
-                    {g.status === "cerrada" && (
+                    {trainer &&
+                      (g.status === "activa" || g.status === "propuesta") && (
+                        <>
+                          <button
+                            className="btn secondary"
+                            onClick={() => open({ kind: "observe", meta: g })}
+                          >
+                            <Pencil size={15} />
+                            Observación
+                          </button>
+                          <button
+                            className="btn subtle"
+                            onClick={() => open({ kind: "close", meta: g })}
+                          >
+                            {g.start_date > now
+                              ? "Cancelar antes del inicio"
+                              : g.status === "propuesta"
+                                ? "Cerrar propuesta"
+                                : "Cerrar meta"}
+                          </button>
+                        </>
+                      )}
+                    {(g.status === "cerrada" || g.status === "cancelada") && (
                       <span className="muted">
                         <ShieldCheck size={14} />
                         Historial de solo lectura
@@ -1229,37 +1281,41 @@ function Login({
               </p>
             )}
           </form>
-          <div className="login-divider">
-            <span>CONOCE CÓMO FUNCIONA</span>
-          </div>
-          <div className="demo-options">
-            <button
-              disabled={busy}
-              onClick={() => onSession({ action: "demo", role: "cliente" })}
-            >
-              <span className="demo-option-icon">
-                <Activity size={22} />
-              </span>
-              <strong>Entrar como cliente</strong>
-              <small>Registra y consulta tus hábitos</small>
-              <ArrowUpRight size={18} />
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => onSession({ action: "demo", role: "entrenador" })}
-            >
-              <span className="demo-option-icon trainer">
-                <Users size={22} />
-              </span>
-              <strong>Entrar como entrenador</strong>
-              <small>Configura metas y acompaña</small>
-              <ArrowUpRight size={18} />
-            </button>
-          </div>
-          <p className="login-caption">
-            <ShieldCheck size={15} />
-            Datos ficticios · Cambios privados de esta sesión por 8 horas
-          </p>
+          {!configured && (
+            <>
+              <div className="login-divider">
+                <span>CONOCE CÓMO FUNCIONA</span>
+              </div>
+              <div className="demo-options">
+                <button
+                  disabled={busy}
+                  onClick={() => onSession({ action: "demo", role: "cliente" })}
+                >
+                  <span className="demo-option-icon">
+                    <Activity size={22} />
+                  </span>
+                  <strong>Entrar como cliente</strong>
+                  <small>Registra y consulta tus hábitos</small>
+                  <ArrowUpRight size={18} />
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => onSession({ action: "demo", role: "entrenador" })}
+                >
+                  <span className="demo-option-icon trainer">
+                    <Users size={22} />
+                  </span>
+                  <strong>Entrar como entrenador</strong>
+                  <small>Configura metas y acompaña</small>
+                  <ArrowUpRight size={18} />
+                </button>
+              </div>
+              <p className="login-caption">
+                <ShieldCheck size={15} />
+                Datos ficticios · Cambios privados de esta sesión por 8 horas
+              </p>
+            </>
+          )}
         </div>
         <div className="login-credit">Ingeniería Web · Miguel Andrés Punin</div>
       </section>
@@ -1419,17 +1475,19 @@ function IndicatorView({
       </div>
       <div className="indicator-values">
         <div>
-          <small>INICIAL</small>
+          <small>{i.kind === "PESO" ? "PESO INICIAL" : "INICIAL"}</small>
           <span>
             {i.initial}
             <em>{i.unit}</em>
           </span>
         </div>
         <div className="current">
-          <small>ACTUAL</small>
+          <small>
+            {i.kind === "PESO" ? "ÚLTIMO PESO REGISTRADO" : "ACTUAL"}
+          </small>
           <span>
-            {fmt(i.current)}
-            <em>{i.unit}</em>
+            {i.current == null ? "Sin registro" : fmt(i.current)}
+            {i.current != null && <em>{i.unit}</em>}
           </span>
         </div>
         <div>
@@ -1543,6 +1601,9 @@ function ModalView({
 }) {
   const meta = m.meta,
     r = m.record;
+  const closeMax = meta && meta.end_date < now ? meta.end_date : now;
+  const closeBeforeStart =
+    m.kind === "close" && !!meta && meta.start_date > closeMax;
   const [category, setCategory] = useState(
       String(r?.action ?? (m.table ? actions[m.table] : "exercise")),
     ),
@@ -1553,21 +1614,34 @@ function ModalView({
       : meta?.type === "MEJORAR_FUERZA"
         ? ["FUERZA"]
         : ["PESO", "PERIMETRO"];
+  const [routine, setRoutine] = useState<NonNullable<Meta["training_plan"]>>(
+    [],
+  );
+  const [routineError, setRoutineError] = useState("");
+  const totalMinutes = routine.reduce(
+    (total, session) => total + session.minutes,
+    0,
+  );
   const blank = () => ({
     kind: allowed[0],
     name:
       allowed[0] === "SEMANAS_CUMPLIDAS"
         ? "Semanas cumplidas"
         : allowed[0] === "FUERZA"
-          ? "Press de banca"
+          ? ""
           : "Peso corporal",
     unit: allowed[0] === "SEMANAS_CUMPLIDAS" ? "semanas" : "kg",
-    initial: allowed[0] === "SEMANAS_CUMPLIDAS" ? 0 : 20,
-    target: allowed[0] === "SEMANAS_CUMPLIDAS" ? 4 : 30,
+    initial:
+      allowed[0] === "SEMANAS_CUMPLIDAS"
+        ? "0"
+        : allowed[0] === "PESO"
+          ? String(meta?.reported_weight_kg ?? "")
+          : "",
+    target: "",
     exercise: "",
     technique: "",
     equipment: "",
-    reps: 10,
+    reps: "",
   });
   const [inds, setInds] = useState([blank()]);
   useEffect(() => {
@@ -1585,7 +1659,7 @@ function ModalView({
   const titles = {
     propose: "Propón tu siguiente meta",
     activate: "Configura el plan de seguimiento",
-    close: "Cerrar meta",
+    close: closeBeforeStart ? "Cancelar meta programada" : "Cerrar meta",
     observe: "Observación del entrenador",
     record: r?.id ? "Corregir registro" : "Un paso más en tu día",
     delete: "Eliminar registro",
@@ -1597,13 +1671,30 @@ function ModalView({
     const f = Object.fromEntries(new FormData(e.currentTarget));
     if (m.kind === "reset") return onReset();
     if (m.kind === "propose") return onSubmit({ ...f, action: "propose" });
-    if (m.kind === "activate")
+    if (m.kind === "activate") {
+      if (
+        !routine.length ||
+        routine.some((session) => !session.minutes || !session.groups.length)
+      ) {
+        setRoutineError(
+          "Selecciona al menos un día e indica los minutos y grupos musculares de cada sesión.",
+        );
+        return;
+      }
+      setRoutineError("");
       return onSubmit({
         ...f,
         action: "activate",
         meta_id: meta!.id,
         indicators: inds,
+        exercise_days: routine.length,
+        training_plan: trainingDays.flatMap((day) =>
+          routine.filter((session) => session.day === day),
+        ),
       });
+    }
+    if (m.kind === "close" && closeBeforeStart)
+      return onSubmit({ action: "cancel", meta_id: meta!.id });
     if (m.kind === "close" || m.kind === "observe")
       return onSubmit({ ...f, action: m.kind, meta_id: meta!.id });
     if (m.kind === "delete")
@@ -1735,6 +1826,24 @@ function ModalView({
                     ))}
                   </select>
                 </Field>
+                <Field label="¿Cuánto pesas actualmente? (kg)">
+                  <input
+                    name="reported_weight_kg"
+                    type="number"
+                    min="20"
+                    max="500"
+                    step="any"
+                    required
+                  />
+                </Field>
+                <Field label="¿Qué quieres conseguir? ¿Hay algo que tu entrenador deba saber?">
+                  <textarea
+                    name="goal_details"
+                    maxLength={1000}
+                    rows={3}
+                    placeholder="Ej. Quiero ganar masa muscular y puedo entrenar por las tardes."
+                  />
+                </Field>
                 <div className="form-grid">
                   <Field label="Fecha de inicio">
                     <input
@@ -1779,14 +1888,132 @@ function ModalView({
                     />
                   </Field>
                 </div>
-                <h3 className="form-section">Objetivos semanales</h3>
+                <div className="notice">
+                  <strong>Peso reportado por el cliente:</strong>{" "}
+                  {meta!.reported_weight_kg == null
+                    ? "Sin dato en esta propuesta"
+                    : `${meta!.reported_weight_kg} kg`}
+                  {meta!.goal_details && <p>{meta!.goal_details}</p>}
+                </div>
+                <h3 className="form-section">Rutina semanal</h3>
+                <p>
+                  Marca los días de entrenamiento. Indica cuánto dura cada
+                  sesión y qué grupos se trabajan.
+                </p>
+                <p>
+                  <strong>
+                    {routine.length} días por semana · {fmt(totalMinutes / 60)}{" "}
+                    h en total ({totalMinutes} min)
+                  </strong>
+                </p>
+                {trainingDays.map((day) => {
+                  const session = routine.find((entry) => entry.day === day);
+                  return (
+                    <fieldset className="indicator-form" key={day}>
+                      <legend>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={!!session}
+                            onChange={(e) =>
+                              setRoutine(
+                                e.target.checked
+                                  ? [
+                                      ...routine,
+                                      { day, minutes: 0, groups: [] },
+                                    ]
+                                  : routine.filter(
+                                      (entry) => entry.day !== day,
+                                    ),
+                              )
+                            }
+                          />{" "}
+                          {day}
+                        </label>
+                      </legend>
+                      {session && (
+                        <>
+                          <Field label="Duración de esta sesión (minutos)">
+                            <input
+                              type="number"
+                              min="1"
+                              max="1440"
+                              step="1"
+                              required
+                              value={session.minutes || ""}
+                              placeholder="Ej. 60"
+                              onChange={(e) =>
+                                setRoutine(
+                                  routine.map((entry) =>
+                                    entry.day === day
+                                      ? {
+                                          ...entry,
+                                          minutes: Number(e.target.value),
+                                        }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                            />
+                          </Field>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: "8px 16px",
+                            }}
+                          >
+                            {muscleGroups.map((group) => (
+                              <label key={group}>
+                                <input
+                                  type="checkbox"
+                                  checked={session.groups.includes(group)}
+                                  onChange={(e) =>
+                                    setRoutine(
+                                      routine.map((entry) =>
+                                        entry.day === day
+                                          ? {
+                                              ...entry,
+                                              groups: e.target.checked
+                                                ? [...entry.groups, group]
+                                                : entry.groups.filter(
+                                                    (name) => name !== group,
+                                                  ),
+                                            }
+                                          : entry,
+                                      ),
+                                    )
+                                  }
+                                />{" "}
+                                {group}
+                              </label>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </fieldset>
+                  );
+                })}
+                {routineError && (
+                  <p role="alert" className="notice">
+                    {routineError}
+                  </p>
+                )}
+                <Field label="Comentario del entrenador al aceptar la meta">
+                  <textarea
+                    name="observation"
+                    maxLength={2000}
+                    rows={3}
+                    placeholder="Explica al cliente cómo empezar y qué debe tener en cuenta."
+                  />
+                </Field>
+                <h3 className="form-section">Alimentación y descanso</h3>
                 <div className="form-grid three">
                   {[
-                    ["exercise_days", "Ejercicio", 4],
-                    ["food_days", "Alimentación", 6],
-                    ["sleep_days", "Sueño", 5],
+                    ["food_days", "Alimentación · días por semana", 6],
+                    ["sleep_days", "Sueño · días por semana", 5],
                   ].map(([name, label, value]) => (
-                    <Field key={String(name)} label={label + " (días)"}>
+                    <Field key={String(name)} label={String(label)}>
                       <input
                         name={String(name)}
                         type="number"
@@ -1800,7 +2027,7 @@ function ModalView({
                   ))}
                 </div>
                 <div className="form-grid">
-                  <Field label="Sueño mínimo (horas / día)">
+                  <Field label="Mínimo de sueño por noche (horas)">
                     <input
                       name="sleep_min"
                       type="number"
@@ -1811,7 +2038,7 @@ function ModalView({
                       required
                     />
                   </Field>
-                  <Field label="Sueño máximo (horas / día)">
+                  <Field label="Máximo de sueño por noche (horas)">
                     <input
                       name="sleep_max"
                       type="number"
@@ -1867,8 +2094,16 @@ function ModalView({
                           kind: "Tipo",
                           name: "Nombre",
                           unit: "Unidad",
-                          initial: "Valor inicial",
-                          target: "Objetivo",
+                          initial:
+                            i.kind === "PESO"
+                              ? meta!.reported_weight_kg != null
+                                ? "Peso inicial reportado por el cliente (kg)"
+                                : "Peso inicial confirmado con el cliente (kg)"
+                              : "Valor inicial medido",
+                          target:
+                            i.kind === "PESO"
+                              ? "Peso objetivo acordado (kg)"
+                              : "Valor objetivo acordado",
                           exercise: "Ejercicio",
                           technique: "Técnica",
                           equipment: "Equipo",
@@ -1887,6 +2122,20 @@ function ModalView({
                                         ? {
                                             ...r,
                                             kind,
+                                            name:
+                                              kind === "PESO"
+                                                ? "Peso corporal"
+                                                : kind === "PERIMETRO"
+                                                  ? "Perímetro corporal"
+                                                  : r.name,
+                                            initial:
+                                              kind === "PESO"
+                                                ? String(
+                                                    meta!.reported_weight_kg ??
+                                                      "",
+                                                  )
+                                                : "",
+                                            target: "",
                                             unit:
                                               kind === "SEMANAS_CUMPLIDAS"
                                                 ? "semanas"
@@ -1909,6 +2158,14 @@ function ModalView({
                               <input
                                 required
                                 value={i[k]}
+                                readOnly={
+                                  (i.kind === "PESO" &&
+                                    (k === "unit" ||
+                                      (k === "initial" &&
+                                        meta!.reported_weight_kg != null))) ||
+                                  (i.kind === "SEMANAS_CUMPLIDAS" &&
+                                    (k === "initial" || k === "unit"))
+                                }
                                 type={
                                   ["initial", "target", "reps"].includes(k)
                                     ? "number"
@@ -1922,13 +2179,7 @@ function ModalView({
                                       n === index
                                         ? {
                                             ...r,
-                                            [k]: [
-                                              "initial",
-                                              "target",
-                                              "reps",
-                                            ].includes(k)
-                                              ? Number(e.target.value)
-                                              : e.target.value,
+                                            [k]: e.target.value,
                                           }
                                         : r,
                                     ),
@@ -1947,17 +2198,30 @@ function ModalView({
             {m.kind === "close" && (
               <>
                 <div className="notice">
-                  El historial quedará de solo lectura. La siguiente meta debe
-                  empezar después del cierre.
+                  {closeBeforeStart
+                    ? "La meta quedará en el historial como cancelada y podrás activar otra."
+                    : "El historial quedará de solo lectura. La siguiente meta debe empezar después del cierre."}
                 </div>
-                <Field label="Fin efectivo">
-                  <input
-                    name="end_date"
-                    type="date"
-                    defaultValue={now < meta!.end_date ? now : meta!.end_date}
-                    required
-                  />
-                </Field>
+                {closeBeforeStart ? (
+                  <p role="alert">
+                    Esta meta estaba programada para empezar el{" "}
+                    {nice(meta!.start_date)}.
+                  </p>
+                ) : (
+                  <Field
+                    label="Fin efectivo"
+                    hint={`Elige una fecha entre el ${nice(meta!.start_date)} y el ${nice(closeMax)}.`}
+                  >
+                    <input
+                      name="end_date"
+                      type="date"
+                      min={meta!.start_date}
+                      max={closeMax}
+                      defaultValue={closeMax}
+                      required
+                    />
+                  </Field>
+                )}
               </>
             )}
             {m.kind === "observe" && (
@@ -2236,15 +2500,17 @@ function ModalView({
               >
                 {busy
                   ? "Guardando…"
-                  : m.kind === "activate"
-                    ? "Validar y activar"
-                    : m.kind === "delete"
-                      ? "Eliminar registro"
-                      : m.kind === "reset"
-                        ? "Reiniciar"
-                        : m.kind === "propose"
-                          ? "Enviar propuesta"
-                          : "Guardar cambios"}
+                  : closeBeforeStart
+                    ? "Confirmar cancelación"
+                    : m.kind === "activate"
+                      ? "Validar y activar"
+                      : m.kind === "delete"
+                        ? "Eliminar registro"
+                        : m.kind === "reset"
+                          ? "Reiniciar"
+                          : m.kind === "propose"
+                            ? "Enviar propuesta"
+                            : "Guardar cambios"}
                 {!busy && <Check size={16} />}
               </button>
             )}

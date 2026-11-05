@@ -1,7 +1,11 @@
 export type Role = "cliente" | "entrenador";
 export type GoalType =
-  "BAJAR_PESO" | "GANAR_MASA" | "MEJORAR_FUERZA" | "MANTENER_HABITOS";
-export type Status = "propuesta" | "activa" | "cerrada";
+  | "BAJAR_PESO"
+  | "GANAR_MASA"
+  | "DEFINIR"
+  | "MEJORAR_FUERZA"
+  | "MANTENER_HABITOS";
+export type Status = "propuesta" | "activa" | "cerrada" | "cancelada";
 export type IndicatorKind =
   "PESO" | "PERIMETRO" | "FUERZA" | "SEMANAS_CUMPLIDAS";
 export interface Usuario {
@@ -11,6 +15,35 @@ export interface Usuario {
   trainer_id: string | null;
   timezone: string;
 }
+export const trainingDays = [
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  "Sábado",
+  "Domingo",
+] as const;
+export const muscleGroups = [
+  "Cuerpo completo",
+  "Tren superior",
+  "Tren inferior",
+  "Hombros",
+  "Pecho",
+  "Espalda",
+  "Piernas",
+  "Bíceps",
+  "Tríceps",
+  "Cuádriceps",
+  "Glúteos",
+  "Abdomen",
+  "Cardio",
+] as const;
+export interface TrainingSession {
+  day: (typeof trainingDays)[number];
+  minutes: number;
+  groups: (typeof muscleGroups)[number][];
+}
 export interface Meta {
   id: string;
   client_id: string;
@@ -18,6 +51,9 @@ export interface Meta {
   status: Status;
   start_date: string;
   end_date: string;
+  reported_weight_kg?: number | null;
+  goal_details?: string;
+  training_plan?: TrainingSession[];
   exercise_days: number;
   food_days: number;
   sleep_days: number;
@@ -99,6 +135,7 @@ export interface Context {
 export const goalLabels: Record<GoalType, string> = {
   BAJAR_PESO: "Bajar de peso",
   GANAR_MASA: "Ganar masa muscular",
+  DEFINIR: "Definir y tonificar",
   MEJORAR_FUERZA: "Mejorar fuerza",
   MANTENER_HABITOS: "Mantener hábitos",
 };

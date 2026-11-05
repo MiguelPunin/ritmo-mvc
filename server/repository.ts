@@ -44,13 +44,24 @@ export async function supabase<T = unknown>(
       message?: string;
       msg?: string;
       error_description?: string;
+      code?: string;
+      error_code?: string;
     } | null;
     const message =
       e?.message ??
       e?.msg ??
       e?.error_description ??
       "No se pudo completar la operación.";
-    throw new DomainError(message, r.status === 401 ? 401 : 422);
+    // Supabase Auth can report a rejected access token as HTTP 403.
+    const rejectedToken =
+      Boolean(token) &&
+      (e?.error_code === "bad_jwt" ||
+        e?.code === "PGRST301" ||
+        (r.status === 403 && /^invalid JWT\b/i.test(message)));
+    throw new DomainError(
+      message,
+      r.status === 401 || rejectedToken ? 401 : 422,
+    );
   }
   return data as T;
 }

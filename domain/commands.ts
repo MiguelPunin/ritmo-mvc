@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { State, Usuario, Meta, Table, Indicador } from "./types";
+import { muscleGroups, trainingDays } from "./types";
 import { today, hours, monday, addDays } from "./core";
 export class DomainError extends Error {
   constructor(
@@ -25,8 +26,8 @@ const indicator = z.object({
   kind: z.enum(["PESO", "PERIMETRO", "FUERZA", "SEMANAS_CUMPLIDAS"]),
   name: text,
   unit: text,
-  initial: num.min(0),
-  target: num.min(0),
+  initial: z.union([z.number(), z.string().trim().min(1)]).pipe(num.min(0)),
+  target: z.union([z.number(), z.string().trim().min(1)]).pipe(num.min(0)),
   exercise: z.string().trim().max(160).default(""),
   technique: z.string().trim().max(300).default(""),
   equipment: z.string().trim().max(160).default(""),
@@ -35,9 +36,15 @@ const indicator = z.object({
 export const commandSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("propose"),
+    reported_weight_kg: z
+      .union([z.number(), z.string().trim().min(1)])
+      .pipe(num.min(20).max(500))
+      .optional(),
+    goal_details: z.string().trim().max(1000).optional(),
     type: z.enum([
       "BAJAR_PESO",
       "GANAR_MASA",
+      "DEFINIR",
       "MEJORAR_FUERZA",
       "MANTENER_HABITOS",
     ]),
@@ -54,8 +61,21 @@ export const commandSchema = z.discriminatedUnion("action", [
     sleep_days: z.coerce.number().int().min(1).max(7),
     sleep_min: num.min(0.1).max(24),
     sleep_max: num.min(0.1).max(24),
+    training_plan: z
+      .array(
+        z.object({
+          day: z.enum(trainingDays),
+          minutes: z.number().int().min(1).max(1440),
+          groups: z.array(z.enum(muscleGroups)).min(1).max(muscleGroups.length),
+        }),
+      )
+      .min(1)
+      .max(7)
+      .optional(),
+    observation: z.string().trim().max(2000).optional(),
     indicators: z.array(indicator).min(1).max(6),
   }),
+  z.object({ action: z.literal("cancel"), meta_id: id }),
   z.object({ action: z.literal("close"), meta_id: id, end_date: date }),
   z.object({
     action: z.literal("observe"),
@@ -178,6 +198,12 @@ export function prepare(
         id: crypto.randomUUID(),
         client_id: user.id,
         type: c.type,
+        ...(c.reported_weight_kg === undefined
+          ? {}
+          : { reported_weight_kg: c.reported_weight_kg }),
+        ...(c.goal_details === undefined
+          ? {}
+          : { goal_details: c.goal_details }),
         status: "propuesta",
         start_date: c.start_date,
         end_date: c.end_date,
@@ -193,13 +219,13 @@ export function prepare(
     };
   }
   const meta = authorize(user, state, c.meta_id);
-  if (["activate", "close", "observe"].includes(c.action)) {
+  if (["activate", "close", "cancel", "observe"].includes(c.action)) {
     if (user.role !== "entrenador")
       throw new DomainError(
         "Esta operación corresponde al entrenador asignado.",
         403,
       );
-    if (meta.status === "cerrada")
+    if (meta.status === "cerrada" || meta.status === "cancelada")
       throw new DomainError("El historial cerrado es de solo lectura.");
     if (c.action === "activate") {
       if (meta.status !== "propuesta")
@@ -229,7 +255,7 @@ export function prepare(
           (m) =>
             m.id !== meta.id &&
             m.client_id === meta.client_id &&
-            m.status !== "propuesta" &&
+            (m.status === "activa" || m.status === "cerrada") &&
             c.start_date <= m.end_date &&
             c.end_date >= m.start_date,
         )
@@ -247,7 +273,24 @@ export function prepare(
         throw new DomainError(
           "Hay indicadores incompatibles con el tipo de meta.",
         );
-      for (const i of c.indicators) {
+      if (
+        c.training_plan &&
+        (c.training_plan.length !== c.exercise_days ||
+          new Set(c.training_plan.map((session) => session.day)).size !==
+            c.exercise_days ||
+          c.training_plan.some(
+            (session) => new Set(session.groups).size !== session.groups.length,
+          ))
+      )
+        throw new DomainError(
+          "Selecciona días distintos y grupos sin repetir. El número de días debe coincidir con la rutina.",
+        );
+      const configuredIndicators = c.indicators.map((i) =>
+        i.kind === "PESO" && meta.reported_weight_kg != null
+          ? { ...i, initial: meta.reported_weight_kg, unit: "kg" }
+          : i,
+      );
+      for (const i of configuredIndicators) {
         if (i.initial === i.target)
           throw new DomainError(
             "El valor inicial y el objetivo deben ser distintos.",
@@ -283,14 +326,26 @@ export function prepare(
             );
         }
       }
-      const { action, meta_id, indicators, ...fields } = c;
+      const { action, meta_id, indicators, observation, ...fields } = c;
+      void indicators;
       void action;
       void meta_id;
       return {
         table: "metas",
         activation: {
-          meta: { ...meta, ...fields, status: "activa" },
-          indicators: indicators.map((i) => ({
+          meta: {
+            ...meta,
+            ...fields,
+            status: "activa",
+            ...(observation
+              ? {
+                  observation,
+                  observation_author: user.id,
+                  observation_at: new Date().toISOString(),
+                }
+              : {}),
+          },
+          indicators: configuredIndicators.map((i) => ({
             ...i,
             id: crypto.randomUUID(),
             meta_id: meta.id,
@@ -298,18 +353,29 @@ export function prepare(
         },
       };
     }
+    if (c.action === "cancel") {
+      const clientToday = today(
+        state.usuarios.find((u) => u.id === meta.client_id)?.timezone ??
+          user.timezone,
+      );
+      if (meta.start_date <= clientToday)
+        throw new DomainError("La meta ya empezó. Usa Cerrar meta.");
+      return { table: "metas", row: { ...meta, status: "cancelada" } };
+    }
     if (c.action === "close") {
       const clientToday = today(
         state.usuarios.find((u) => u.id === meta.client_id)?.timezone ??
           user.timezone,
       );
-      if (
-        c.end_date < meta.start_date ||
-        c.end_date > clientToday ||
-        c.end_date > meta.end_date
-      )
+      const latestCloseDate =
+        meta.end_date < clientToday ? meta.end_date : clientToday;
+      if (meta.start_date > latestCloseDate)
         throw new DomainError(
-          "El cierre debe estar entre el inicio y el menor de hoy o el fin previsto.",
+          `Esta meta todavía no empieza. Podrás cerrarla a partir del ${meta.start_date}.`,
+        );
+      if (c.end_date < meta.start_date || c.end_date > latestCloseDate)
+        throw new DomainError(
+          `Elige una fecha de cierre entre ${meta.start_date} y ${latestCloseDate}.`,
         );
       const dates = [
         ...state.ejercicios,
@@ -356,7 +422,12 @@ export function prepare(
       throw new DomainError("Registro no encontrado.", 404);
     return { table: c.table, deleteId: c.id };
   }
-  if (c.action === "activate" || c.action === "close" || c.action === "observe")
+  if (
+    c.action === "activate" ||
+    c.action === "close" ||
+    c.action === "cancel" ||
+    c.action === "observe"
+  )
     throw new DomainError("Acción no válida.");
   const localDate =
     c.action === "sleep" ? today(user.timezone, new Date(c.end)) : c.date;
