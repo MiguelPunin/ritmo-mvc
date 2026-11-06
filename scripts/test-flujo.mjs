@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 // Ejecutar contra una instancia local. Una sesión ficticia separada por ejecución.
-const base = new URL(process.argv[2] ?? "http://localhost:3100").origin;
+const base = new URL(process.argv[2] ?? "http://localhost:8080").origin;
 const cookies = new Map();
 async function req(path, input, expected = 200) {
   const response = await fetch(base + path, {
@@ -192,6 +192,11 @@ await command({
   observation: "Observación de prueba",
 });
 await command({ action: "close", meta_id: active.id, end_date: day });
+assert.match(
+  (await command({ ...activation, sleep_min: 10 }, 422)).error,
+  /mínimo de sueño/,
+);
+assert.equal((await session()).state.metas.find((m) => m.id === proposalId).status, "propuesta");
 await command(activation);
 const after = (await session()).state;
 assert.equal(after.metas.find((m) => m.id === active.id).status, "cerrada");

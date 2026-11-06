@@ -4,85 +4,65 @@ Tarea 8 de Ingeniería Web — Administración MVC
 
 Miguel Andrés Punin
 
-Ritmo es una aplicación de seguimiento para clientes de un gimnasio y sus entrenadores. El cliente propone una meta, registra sus hábitos y consulta su avance. El entrenador revisa la propuesta, arma el plan semanal y puede dejar una observación o cerrar la meta.
+Ritmo permite proponer metas, registrar hábitos y consultar el progreso. El entrenador revisa la propuesta, organiza la rutina semanal y da seguimiento al cliente.
 
-[Ver la demostración en YouTube](https://youtu.be/_7xACeKQebk)
+Esta versión usa **React con Vite**, **Spring Boot** y **Supabase PostgreSQL**. El [video de la entrega original](https://youtu.be/_7xACeKQebk) muestra el flujo de Ritmo con la implementación anterior. Los archivos del backend que aparecen en ese video corresponden a esa versión.
 
-## Cuentas de prueba
+## Ejecutar en desarrollo
 
-Estas cuentas permiten probar los dos roles en una instalación conectada al proyecto Supabase de la entrega.
+Requisitos: Node.js 22.13 o superior, JDK 17 o superior. El repositorio incluye Maven Wrapper.
 
-| Rol | Correo | Contraseña de prueba |
-| --- | --- | --- |
-| Cliente (Miguel) | `miguel@gmail.com` | `123456` |
-| Entrenador | `entrenador@gmail.com` | `123456` |
+Desde la raíz del repositorio, inicia el backend:
 
-Con la cuenta de cliente puedes proponer una meta y registrar hábitos. Con la cuenta de entrenador puedes revisar la propuesta y configurar el plan semanal.
+```sh
+.\mvnw.cmd spring-boot:run
+```
 
-## Ejecutar el proyecto
-
-Se necesita Node.js 22.13 o superior y npm. Desde la carpeta del proyecto:
+En Linux o macOS, usa `./mvnw` en lugar de `.\mvnw.cmd`. En otra terminal, desde la misma carpeta, inicia React:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Abre [localhost:3000](http://localhost:3000). Si ejecutas el proyecto sin configurar Supabase, puedes entrar como cliente o entrenador con datos de prueba.
+Abre [localhost:3000](http://localhost:3000). Vite envía las solicitudes de la API a Spring Boot en el puerto 8080. Si no configuras Supabase, puedes usar el modo de demostración con datos ficticios en tu sesión.
 
 ## Usar la base de prueba
 
-Las migraciones ya están aplicadas en la base de la entrega. Para usarla, crea un archivo `.env.local` junto a `package.json` y copia este bloque:
+Crea `.env.local` junto a `pom.xml` y copia estas variables. Las migraciones ya están aplicadas en la base compartida.
 
 ```dotenv
 SUPABASE_URL=https://lclrgaghdvhoogzxmwut.supabase.co
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_zG5bUQE0IHUR93MOUtsYJg_Qmpcbaxj
 ```
 
-Ejecuta `npm ci` y `npm run dev`. Si el servidor ya estaba abierto, reinícialo. Entra en [localhost:3000](http://localhost:3000) con una de las cuentas de prueba de arriba. Los cambios se guardan en la base compartida.
+Reinicia Spring Boot y entra con una cuenta de prueba. Las operaciones de estas cuentas afectan los datos de la base compartida.
 
-## Configurar una base propia
+| Rol | Correo | Contraseña de prueba |
+| --- | --- | --- |
+| Cliente (Miguel) | `miguel@gmail.com` | `123456` |
+| Entrenador | `entrenador@gmail.com` | `123456` |
 
-1. En una base nueva, abre el **SQL Editor** y ejecuta las migraciones en orden: [001](supabase/migrations/001_ritmo.sql), [002](supabase/migrations/002_datos_cliente_y_rutina.sql) y [003](supabase/migrations/003_cancelar_meta_programada.sql).
-2. En **Authentication → Users**, crea una cuenta para el entrenador y otra para el cliente, confirma sus correos y copia los UUID de ambas.
-3. En el **SQL Editor**, reemplaza los UUID de ejemplo y ejecuta estas sentencias para crear los perfiles y asignar el cliente a su entrenador:
+Para usar una base propia, ejecuta en el SQL Editor las migraciones [001](supabase/migrations/001_ritmo.sql), [002](supabase/migrations/002_datos_cliente_y_rutina.sql) y [003](supabase/migrations/003_cancelar_meta_programada.sql), en ese orden. Crea las cuentas en Authentication y agrega sus perfiles a `public.usuarios` con los mismos UUID. Crea primero al entrenador y luego al cliente, cuyo `trainer_id` debe apuntar al entrenador. Reemplaza las variables de `.env.local` por las de tu proyecto.
 
-   ```sql
-   insert into public.usuarios (id, name, role, trainer_id, timezone)
-   values ('UUID_ENTRENADOR', 'Entrenador de prueba', 'entrenador', null, 'America/Guayaquil');
+## Administración MVC
 
-   insert into public.usuarios (id, name, role, trainer_id, timezone)
-   values ('UUID_CLIENTE', 'Cliente de prueba', 'cliente', 'UUID_ENTRENADOR', 'America/Guayaquil');
-   ```
+- **Vista.** [app/page.tsx](app/page.tsx) contiene los formularios de React. En una medición, el cliente elige por nombre un indicador de la meta seleccionada.
+- **Controlador.** [RitmoController.java](src/main/java/ec/ritmo/RitmoController.java) recibe las solicitudes de sesión y administración.
+- **Reglas y datos.** [Commands.java](src/main/java/ec/ritmo/Commands.java) valida permisos, fechas, rutinas e indicadores. Por ejemplo, rechaza una segunda meta activa o un mínimo de sueño mayor al máximo antes de guardar. [RitmoService.java](src/main/java/ec/ritmo/RitmoService.java) aplica los cambios y [Supabase.java](src/main/java/ec/ritmo/Supabase.java) los envía usando el token de la cuenta.
 
-4. Crea `.env.local` junto a `package.json` y completa estas variables con la URL y la clave publicable de tu proyecto:
+La tabla `metas` se relaciona con el cliente mediante `client_id`. Indicadores, mediciones, ejercicios, alimentos, sueño y sustancias usan `meta_id`. Una medición también usa `indicator_id` para identificar qué se midió.
 
-   ```dotenv
-   SUPABASE_URL=https://TU-PROYECTO.supabase.co
-   SUPABASE_PUBLISHABLE_KEY=TU_CLAVE_PUBLICABLE
-   ```
-
-5. Reinicia `npm run dev` y entra con una de las cuentas creadas en Supabase.
-
-## Cómo funciona el MVC
-
-- **Vista.** [app/page.tsx](app/page.tsx) muestra los formularios y el panel de cada rol.
-- **Controlador.** [app/api/admin/route.ts](app/api/admin/route.ts) recibe las operaciones, comprueba la sesión y llama a las reglas del dominio antes de guardar.
-- **Modelo.** [domain/commands.ts](domain/commands.ts) contiene las reglas, [domain/core.ts](domain/core.ts) calcula el seguimiento y [server/repository.ts](server/repository.ts) accede a los datos.
-
-Por ejemplo, si el entrenador intenta activar una segunda meta para un cliente que ya tiene una activa, el servidor rechaza la operación. Al registrar una medición, el cliente elige el indicador por nombre en un desplegable que muestra los indicadores de esa meta.
-
-## Tablas
-
-`usuarios` contiene los perfiles de clientes y entrenadores. `metas` guarda el plan de cada cliente. Las tablas `indicadores`, `mediciones`, `ejercicios`, `alimentos`, `suenos` y `sustancias` se relacionan con la meta por `meta_id`. Cada medición también guarda `indicator_id` para identificar qué se midió, por ejemplo, el peso corporal.
-
-## Compilar y ejecutar
-
-Para producción, configura las variables de Supabase en el entorno del servidor y ejecuta:
+## Compilar y desplegar
 
 ```sh
+npm ci
+npm run check
 npm run build
-npm run start
+.\mvnw.cmd clean package
+java -jar target/ritmo-mvc-1.0.0.jar
 ```
 
-Para revisar los tipos, ejecuta `npm run check`.
+Abre [localhost:8080](http://localhost:8080). El JAR sirve tanto React como la API. También puedes desplegar con el [Dockerfile](Dockerfile) en un servidor que admita contenedores. Configura `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY` como variables del servidor. El puerto se puede cambiar con `PORT`.
+
+Para probar el flujo completo, ejecuta el JAR sin Supabase y luego `npm run test:flujo -- http://localhost:8080`.
