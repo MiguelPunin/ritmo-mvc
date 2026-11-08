@@ -1686,7 +1686,9 @@ function ModalView({
         ...f,
         action: "activate",
         meta_id: meta!.id,
-        indicators: inds,
+        indicators: inds.map((indicator) =>
+          indicator.kind === "FUERZA" ? indicator : { ...indicator, reps: 0 },
+        ),
         exercise_days: routine.length,
         training_plan: trainingDays.flatMap((day) =>
           routine.filter((session) => session.day === day),
