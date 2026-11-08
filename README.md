@@ -6,7 +6,7 @@ Miguel Andrés Punin
 
 Ritmo permite proponer metas, registrar hábitos y consultar el progreso. El entrenador revisa la propuesta, organiza la rutina semanal y da seguimiento al cliente.
 
-Esta versión usa **React con Vite**, **Spring Boot** y **Supabase PostgreSQL**. El [video de la entrega original](https://youtu.be/_7xACeKQebk) muestra el flujo de Ritmo con la implementación anterior. Los archivos del backend que aparecen en ese video corresponden a esa versión.
+Esta versión usa **React con Vite**, **Spring Boot** y **Supabase PostgreSQL**. [Ver la demostración en YouTube](https://youtu.be/nrtwgpJnF4k).
 
 ## Ejecutar en desarrollo
 
